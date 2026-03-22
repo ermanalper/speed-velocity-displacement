@@ -7,7 +7,7 @@ SPI_HandleTypeDef *hspi5ptr;
 volatile int16_t *x_axisptr;
 volatile int16_t *y_axisptr;
 volatile int16_t *z_axisptr;
-float xdps, ydps, zdps;
+volatile float *xdps_ptr, *ydps_ptr, *zdps_ptr;
 uint8_t spi_tx_buf[7]; //1 tx and 7 garbage values
 uint8_t spi_rx_buf[7]; //1 garbage value and 7 axes values. Axes values in indices 1-6
 
@@ -103,11 +103,15 @@ HAL_StatusTypeDef L3GD20_Reg_Write(uint8_t regaddr, uint8_t data) {
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET); //set CS to stop communication
 	return res;
 }
-void L3GD20_Init(SPI_HandleTypeDef *hspi5, volatile int16_t *x_axis, volatile int16_t *y_axis, volatile int16_t *z_axis) {
+void L3GD20_Init(SPI_HandleTypeDef *hspi5, volatile int16_t *x_axis, volatile int16_t *y_axis, volatile int16_t *z_axis,
+		volatile float *xdps, volatile float *ydps, volatile float *zdps) {
 	hspi5ptr = hspi5;
 	x_axisptr = x_axis;
 	y_axisptr = y_axis;
 	z_axisptr = z_axis;
+	xdps_ptr = xdps;
+	ydps_ptr = ydps;
+	zdps_ptr = zdps;
 
 	uint8_t ctrl1 = 0x3F; //normal mode
 	L3GD20_Reg_Write(CTRL_REG1, ctrl1);
@@ -115,10 +119,10 @@ void L3GD20_Init(SPI_HandleTypeDef *hspi5, volatile int16_t *x_axis, volatile in
 	uint8_t ctrl2 = 0x05; //reset reading HP_RESET_FILTER, cut off freq: 0.18 Hz
 	L3GD20_Reg_Write(CTRL_REG2, ctrl2);
 
-	uint8_t ctrl4 = 0x80;
+	uint8_t ctrl4 = 0x00; //no highpass filter
 	L3GD20_Reg_Write(CTRL_REG4, ctrl4);
 
-	uint8_t ctrl5 = 0x11;
+	uint8_t ctrl5 = 0x00; //no highpass filter
 	L3GD20_Reg_Write(CTRL_REG5, ctrl5);
 
 	spi_tx_buf[0] = OUT_X_L | 0xC0;
@@ -142,9 +146,9 @@ void L3GD20_ReadValuesFromRx(void) {
 	*x_axisptr = (int16_t) ((spi_rx_buf[2] << 8) | spi_rx_buf[1]);
 	*y_axisptr = (int16_t) ((spi_rx_buf[4] << 8) | spi_rx_buf[3]);
 	*z_axisptr = (int16_t) ((spi_rx_buf[6] << 8) | spi_rx_buf[5]);
-	xdps = (float)*x_axisptr * (0.00875);
-	ydps = (float)*y_axisptr * (0.00875);
-	zdps = (float)*z_axisptr * (0.00875);
+	*xdps_ptr = (float)*x_axisptr * (0.00875);
+	*ydps_ptr = (float)*y_axisptr * (0.00875);
+	*zdps_ptr = (float)*z_axisptr * (0.00875);
 
 }
 

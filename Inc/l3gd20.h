@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "stm32f4xx_hal.h"
 
-
+#define L3GD20_ODR 95
 #define WHO_AM_I 0x0F
 #define CTRL_REG1 0x20
 #define CTRL_REG2 0x21
@@ -35,7 +35,8 @@
 
 HAL_StatusTypeDef L3GD20_Reg_Read(uint8_t regaddr, volatile uint8_t *pRX);
 HAL_StatusTypeDef L3GD20_Reg_Write(uint8_t regaddr, uint8_t data);
-void L3GD20_Init(SPI_HandleTypeDef *hspi5, volatile int16_t *x_axis, volatile int16_t *y_axis, volatile int16_t *z_axis);
+void L3GD20_Init(SPI_HandleTypeDef *hspi5, volatile int16_t *x_axis, volatile int16_t *y_axis, volatile int16_t *z_axis,
+		volatile float *xdps, volatile float *ydps, volatile float *zdps);
 void readX(void);
 void readY(void);
 void readZ(void);

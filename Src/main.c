@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "l3gd20.h"
+#include "math.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,6 +55,13 @@ uint16_t gyro[3];
 volatile int16_t x_axis;
 volatile int16_t y_axis;
 volatile int16_t z_axis;
+volatile float xdps;
+volatile float ydps;
+volatile float zdps;
+float x_ang, y_ang, z_ang; //x_ang: angle between x an yz field ...
+_Bool l3gd20_calibrated = 0;
+uint8_t calibration_counter = 0;
+float x_bias = 0.0f, y_bias = 0.0f, z_bias = 0.0f;
 
 /* USER CODE END PV */
 
@@ -63,6 +72,7 @@ static void MX_DMA_Init(void);
 static void MX_SPI5_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM1_Init(void);
+static void calculate_angle(void);
 /* USER CODE BEGIN PFP */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 
@@ -81,7 +91,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  x_ang = 0.0;
+  y_ang = 0.0;
+  z_ang = 0.0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -114,7 +126,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   //Initialize
-  L3GD20_Init(&hspi5, &x_axis, &y_axis, &z_axis);
+  L3GD20_Init(&hspi5, &x_axis, &y_axis, &z_axis, &xdps, &ydps, &zdps);
     while (1)
   {
     	//ana loop
@@ -594,8 +606,48 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if (hspi->Instance == SPI5) {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET); //stop SPI transfer
-		L3GD20_ReadValuesFromRx(); //Read axes' values from rx buffer
+		L3GD20_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
+		calculate_angle();
 	}
+}
+static void calculate_angle() {
+	if (!l3gd20_calibrated) {
+		//use data to calibrate
+		calibration_counter += 1;
+		x_bias += (float)x_axis;
+		y_bias += (float)y_axis;
+		z_bias += (float)z_axis;
+		if (calibration_counter >= 250) {
+			x_bias /= 250.0f;
+		    y_bias /= 250.0f;
+		    z_bias /= 250.0f;
+		    x_bias *= 0.00875f;
+		    y_bias *= 0.00875f;
+		    z_bias *= 0.00875f;
+		  l3gd20_calibrated = 1;
+		}
+		return;
+	}
+	xdps -= x_bias;
+	ydps -= y_bias;
+	zdps -= z_bias;
+
+	if(fabs(xdps) <= 0.5f) xdps = 0.0f;
+	if(fabs(ydps) <= 0.5f) ydps = 0.0f;
+	if(fabs(zdps) <= 0.5f) zdps = 0.0f;
+
+	x_ang += (((float) xdps) / L3GD20_ODR);
+	while(x_ang >= 360.0) x_ang -= 360.0;
+	while(x_ang < 0.0) x_ang += 360.0;
+
+	y_ang += (((float) ydps) / L3GD20_ODR);
+	while(y_ang >= 360.0) y_ang -= 360.0;
+	while(y_ang < 0.0) y_ang += 360.0;
+
+	z_ang += (((float) zdps) / L3GD20_ODR);
+	while(z_ang >= 360.0) z_ang -= 360.0;
+	while(z_ang < 0.0) z_ang += 360.0;
+
 }
 /* USER CODE END 4 */
 
