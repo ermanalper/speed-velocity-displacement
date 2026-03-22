@@ -1,0 +1,23 @@
+
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+.settings/
+.launches/
+*.launch
+
+*.log
+*.tmp
+*.bak
+
+# CubeMX yapılandırma dosyası (Pinler ve saat ayarları buradadır)
+# !.ioc 
+
+# .project
+# .cproject
+
