@@ -1,0 +1,6 @@
+../Src/adxl345_i2c.c:9:19:ADXL345_Reg_Read_I2C	32	static
+../Src/adxl345_i2c.c:20:6:ADXL345_Init_I2C	24	static
+../Src/adxl345_i2c.c:39:19:ADXL345_Reg_Write_I2C	32	static
+../Src/adxl345_i2c.c:50:19:ADXL345_Reg_ReadMulti_I2C	32	static
+../Src/adxl345_i2c.c:61:6:ADXL345_ReadAxes_I2C	16	static
+../Src/adxl345_i2c.c:71:7:adxl345_convert_to_g	16	static

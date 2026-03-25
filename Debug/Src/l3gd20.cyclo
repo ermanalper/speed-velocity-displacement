@@ -1,0 +1,4 @@
+../Src/l3gd20.c:90:19:L3GD20_Reg_Write	1
+../Src/l3gd20.c:106:6:L3GD20_Init	2
+../Src/l3gd20.c:136:6:L3GD20_ReadAxes_DMA	1
+../Src/l3gd20.c:145:6:L3GD20_ReadValuesFromRx	1

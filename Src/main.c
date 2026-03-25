@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "l3gd20.h"
 #include "math.h"
-
+#include "adxl345_i2c.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,19 +42,23 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c3;
+
 SPI_HandleTypeDef hspi5;
 DMA_HandleTypeDef hdma_spi5_rx;
 DMA_HandleTypeDef hdma_spi5_tx;
 
-TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t data;
 uint16_t gyro[3];
-volatile int16_t x_axis;
-volatile int16_t y_axis;
-volatile int16_t z_axis;
+volatile int16_t x_axis_l3gd20;
+volatile int16_t y_axis_l3gd20;
+volatile int16_t z_axis_l3gd20;
+volatile int16_t x_axis_adxl345;
+volatile int16_t y_axis_adxl345;
+volatile int16_t z_axis_adxl345;
 volatile float xdps;
 volatile float ydps;
 volatile float zdps;
@@ -62,6 +66,7 @@ float x_ang, y_ang, z_ang; //x_ang: angle between x an yz field ...
 _Bool l3gd20_calibrated = 0;
 uint8_t calibration_counter = 0;
 float x_bias = 0.0f, y_bias = 0.0f, z_bias = 0.0f;
+uint8_t pRx = 10;
 
 /* USER CODE END PV */
 
@@ -71,11 +76,10 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI5_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM1_Init(void);
-static void calculate_angle(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
-
+static void calculate_angle(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,21 +121,29 @@ int main(void)
   MX_DMA_Init();
   MX_SPI5_Init();
   MX_TIM2_Init();
-  MX_TIM1_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start_IT(&htim2);
-  HAL_TIM_Base_Start_IT(&htim1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   //Initialize
-  L3GD20_Init(&hspi5, &x_axis, &y_axis, &z_axis, &xdps, &ydps, &zdps);
+
+
+  L3GD20_Init(&hspi5, &x_axis_l3gd20, &y_axis_l3gd20, &z_axis_l3gd20, &xdps, &ydps, &zdps);
+  ADXL345_Init_I2C(&hi2c3, &x_axis_adxl345, &y_axis_adxl345, &z_axis_adxl345);
+  HAL_StatusTypeDef res = ADXL345_Reg_Read_I2C(ADXL345_DEVID, &pRx);
+
+  HAL_TIM_Base_Start_IT(&htim2);
+
+
     while (1)
   {
     	//ana loop
+    	ADXL345_ReadAxes_I2C();
+    	L3GD20_ReadAxes_DMA();
     	HAL_Delay(1);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -186,6 +198,54 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.ClockSpeed = 100000;
+  hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c3, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c3, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
+
+}
+
+/**
   * @brief SPI5 Initialization Function
   * @param None
   * @retval None
@@ -224,52 +284,6 @@ static void MX_SPI5_Init(void)
 }
 
 /**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
-
-  /* USER CODE BEGIN TIM1_Init 0 */
-
-  /* USER CODE END TIM1_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM1_Init 1 */
-
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 99;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1315;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
-
-  /* USER CODE END TIM1_Init 2 */
-
-}
-
-/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -290,7 +304,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 6249;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 249;
+  htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -356,7 +370,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(NCS_MEMS_SPI_GPIO_Port, NCS_MEMS_SPI_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, NCS_MEMS_SPI_Pin|ADXL345_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, CSX_Pin|OTG_FS_PSO_Pin, GPIO_PIN_RESET);
@@ -398,8 +412,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF12_FMC;
   HAL_GPIO_Init(SDNWE_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : NCS_MEMS_SPI_Pin CSX_Pin OTG_FS_PSO_Pin */
-  GPIO_InitStruct.Pin = NCS_MEMS_SPI_Pin|CSX_Pin|OTG_FS_PSO_Pin;
+  /*Configure GPIO pins : NCS_MEMS_SPI_Pin CSX_Pin ADXL345_CS_Pin OTG_FS_PSO_Pin */
+  GPIO_InitStruct.Pin = NCS_MEMS_SPI_Pin|CSX_Pin|ADXL345_CS_Pin|OTG_FS_PSO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -531,22 +545,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF14_LTDC;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : I2C3_SDA_Pin */
-  GPIO_InitStruct.Pin = I2C3_SDA_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C3;
-  HAL_GPIO_Init(I2C3_SDA_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : I2C3_SCL_Pin */
-  GPIO_InitStruct.Pin = I2C3_SCL_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF4_I2C3;
-  HAL_GPIO_Init(I2C3_SCL_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pins : STLINK_RX_Pin STLINK_TX_Pin */
   GPIO_InitStruct.Pin = STLINK_RX_Pin|STLINK_TX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -596,11 +594,9 @@ static void MX_GPIO_Init(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM1) {
-		L3GD20_ReadAxes_DMA();
-	} else if (htim->Instance == TIM2) {
-        HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
-    }
+	if(htim -> Instance == TIM2) {
+		HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
+	}
 }
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
@@ -614,9 +610,9 @@ static void calculate_angle() {
 	if (!l3gd20_calibrated) {
 		//use data to calibrate
 		calibration_counter += 1;
-		x_bias += (float)x_axis;
-		y_bias += (float)y_axis;
-		z_bias += (float)z_axis;
+		x_bias += (float)x_axis_l3gd20;
+		y_bias += (float)y_axis_l3gd20;
+		z_bias += (float)z_axis_l3gd20;
 		if (calibration_counter >= 250) {
 			x_bias /= 250.0f;
 		    y_bias /= 250.0f;

@@ -1,0 +1,11 @@
+../Src/main.c:94:5:main	1
+../Src/main.c:158:6:SystemClock_Config	3
+../Src/main.c:205:13:MX_I2C3_Init	4
+../Src/main.c:253:13:MX_SPI5_Init	2
+../Src/main.c:291:13:MX_TIM2_Init	4
+../Src/main.c:334:13:MX_DMA_Init	1
+../Src/main.c:355:13:MX_GPIO_Init	1
+../Src/main.c:595:6:HAL_TIM_PeriodElapsedCallback	2
+../Src/main.c:602:6:HAL_SPI_TxRxCpltCallback	2
+../Src/main.c:609:13:calculate_angle	12
+../Src/main.c:654:6:Error_Handler	1

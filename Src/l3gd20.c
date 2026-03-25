@@ -3,13 +3,13 @@
 #include <stm32f429xx.h>
 
 
-SPI_HandleTypeDef *hspi5ptr;
+static SPI_HandleTypeDef *hspi5ptr;
 volatile int16_t *x_axisptr;
 volatile int16_t *y_axisptr;
 volatile int16_t *z_axisptr;
 volatile float *xdps_ptr, *ydps_ptr, *zdps_ptr;
-uint8_t spi_tx_buf[7]; //1 tx and 7 garbage values
-uint8_t spi_rx_buf[7]; //1 garbage value and 7 axes values. Axes values in indices 1-6
+static uint8_t spi_tx_buf[7]; //1 tx and 7 garbage values
+static uint8_t spi_rx_buf[7]; //1 garbage value and 7 axes values. Axes values in indices 1-6
 
 
 /*

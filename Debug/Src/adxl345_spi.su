@@ -1,0 +1,3 @@
+../Src/adxl345_spi.c:10:19:ADXL345_Reg_Write	32	static
+../Src/adxl345_spi.c:26:6:ADXL345_Init	16	static
+../Src/adxl345_spi.c:42:19:ADXL345_Reg_Read	32	static
