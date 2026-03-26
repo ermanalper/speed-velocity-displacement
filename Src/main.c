@@ -73,6 +73,7 @@ float grav_x, grav_y, grav_z;
 float x_ang, y_ang, z_ang; //x_ang: Roll, y_ang: Pitch, z_ang: Yaw
 float grav_x, grav_y, grav_z;
 float lin_acc_x, lin_acc_y, lin_acc_z; // acceleration after gravity is eliminated
+float lin_acc_x_g, lin_acc_y_g, lin_acc_z_g;
 _Bool l3gd20_calibrated = 0;
 _Bool adxl345_calibrated = 0;
 uint8_t calibration_counter = 0;
@@ -633,18 +634,26 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 		} else {
 			//eliminate gravity
 
+			float accel_roll = atan2f((float)y_axis_adxl345, (float)z_axis_adxl345) * (180.0f / M_PI);
+			float accel_pitch = atan2f(-(float)x_axis_adxl345, sqrtf(((float)y_axis_adxl345 * (float)y_axis_adxl345) + ((float)z_axis_adxl345 * (float)z_axis_adxl345))) * (180.0f / M_PI);
+
+			//complementary filter
+			x_ang = (0.98f * x_ang) + (0.02f * accel_roll);
+			y_ang = (0.98f * y_ang) + (0.02f * accel_pitch);
+
 			float pitch_rad = y_ang * (M_PI / 180.0f);
-			float roll_rad  = x_ang * (M_PI / 180.0f);
+            float roll_rad  = x_ang * (M_PI / 180.0f);
 
+           grav_x = -sinf(pitch_rad) * 250.0f;
+           grav_y = sinf(roll_rad) * cosf(pitch_rad) * 250.0f;
+           grav_z = cosf(roll_rad) * cosf(pitch_rad) * 250.0f;
 
-			grav_x = -sinf(pitch_rad) * 250.0f;
-			grav_y = sinf(roll_rad) * cosf(pitch_rad) * 250.0f;
-			grav_z = cosf(roll_rad) * cosf(pitch_rad) * 250.0f;
-
-			lin_acc_x = ((float)x_axis_adxl345 - grav_x) * 0.0039f;
-			lin_acc_y = ((float)y_axis_adxl345 - grav_y) * 0.0039f;
-			lin_acc_z = ((float)z_axis_adxl345 - grav_z) * 0.0039f;
-
+           lin_acc_x = ((float)x_axis_adxl345 - grav_x);
+           lin_acc_y = ((float)y_axis_adxl345 - grav_y);
+           lin_acc_z = ((float)z_axis_adxl345 - grav_z);
+           lin_acc_x_g = lin_acc_x * 0.0039f;
+           lin_acc_y_g = lin_acc_y * 0.0039f;
+           lin_acc_z_g = lin_acc_z * 0.0039f;
 
 		}
 		loop = 1;
@@ -684,16 +693,17 @@ static void l3gd20_calculate_angle() {
 	if(fabs(zdps) <= 0.5f) zdps = 0.0f;
 
 	x_ang += (((float) xdps) / L3GD20_ODR);
-	while(x_ang >= 360.0) x_ang -= 360.0;
-	while(x_ang < 0.0) x_ang += 360.0;
+	x_ang += (((float) xdps) / L3GD20_ODR);
+	if (x_ang > 180.0f) x_ang -= 360.0f;
+	if (x_ang < -180.0f) x_ang += 360.0f;
 
 	y_ang += (((float) ydps) / L3GD20_ODR);
-	while(y_ang >= 360.0) y_ang -= 360.0;
-	while(y_ang < 0.0) y_ang += 360.0;
+	if (y_ang > 180.0f) y_ang -= 360.0f;
+	if (y_ang < -180.0f) y_ang += 360.0f;
 
 	z_ang += (((float) zdps) / L3GD20_ODR);
-	while(z_ang >= 360.0) z_ang -= 360.0;
-	while(z_ang < 0.0) z_ang += 360.0;
+	if (z_ang > 180.0f) z_ang -= 360.0f;
+	if (z_ang < -180.0f) z_ang += 360.0f;
 
 }
 static void adxl345_calculate_orientation() {
