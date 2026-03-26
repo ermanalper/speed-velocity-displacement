@@ -5,7 +5,7 @@
 #define I2C_PORT I2C_NUM_0
 
 static I2C_HandleTypeDef *hi2c3;
-volatile int16_t *x, *y, *z;
+int16_t *x, *y, *z;
 uint8_t i2c_rx_buf[6];
 HAL_StatusTypeDef ADXL345_Reg_Read_I2C(uint8_t regaddr, uint8_t *pRx) {
 	return HAL_I2C_Mem_Read(
@@ -23,18 +23,22 @@ void ADXL345_Init_I2C(I2C_HandleTypeDef *hi2c3ptr, int16_t *px, int16_t *py, int
 	x = px;
 	y = py;
 	z = pz;
-	ADXL345_Reg_Write_I2C(ADXL345_POWER_CTL, 0x08);
-	ADXL345_Reg_Write_I2C(ADXL345_DUR, 0x00); //disable tap detection
-	ADXL345_Reg_Write_I2C(ADXL345_LATENT, 0x00); //disable double tap detection
-	ADXL345_Reg_Write_I2C(ADXL345_WINDOW, 0x00); //disable double tap detection
-	ADXL345_Reg_Write_I2C(ADXL345_ACT_INACT_CTL, 0x00); //disable act/inact interrupts
+	//ADXL345_Reg_Write_I2C(ADXL345_DUR, 0x00); //disable tap detection
+//	ADXL345_Reg_Write_I2C(ADXL345_LATENT, 0x00); //disable double tap detection
+	//ADXL345_Reg_Write_I2C(ADXL345_WINDOW, 0x00); //disable double tap detection
+	//ADXL345_Reg_Write_I2C(ADXL345_ACT_INACT_CTL, 0x00); //disable act/inact interrupts
 	ADXL345_Reg_Write_I2C(ADXL345_BW_RATE, 0x0B); //normal power mode, odr 200Hz, bw 100Hz
-	ADXL345_Reg_Write_I2C(ADXL345_INT_ENABLE, 0x80); //enable data ready interrupt only
-	ADXL345_Reg_Write_I2C(ADXL345_INT_MAP, 0x00); //map data ready interrupt to INT1 (0XXXXXXX -> 0 and 7 don't cares)
+	ADXL345_Reg_Write_I2C(ADXL345_INT_ENABLE, 0x80); //disable all interrupts
+	//ADXL345_Reg_Write_I2C(ADXL345_INT_MAP, 0x00); //map data ready interrupt to INT1 (0XXXXXXX -> 0 and 7 don't cares)
 	ADXL345_Reg_Write_I2C(ADXL345_DATA_FORMAT, 0x0B); //full res, +/-16g, right justified w/ sign extension
-	ADXL345_Reg_Write_I2C(ADXL345_FIFO_CTL, 0x00); //bypass fifo
+	//ADXL345_Reg_Write_I2C(ADXL345_FIFO_CTL, 0x00); //bypass fifo
+	HAL_StatusTypeDef status = ADXL345_Reg_Write_I2C(ADXL345_POWER_CTL, 0x08);
 
-	HAL_Delay(50);
+	HAL_Delay(500);
+	uint8_t int_enable_reg = 99;
+	uint8_t int_map_reg = 99;
+	ADXL345_Reg_Read_I2C(ADXL345_INT_ENABLE, &int_enable_reg);
+	ADXL345_Reg_Read_I2C(ADXL345_INT_MAP, &int_map_reg);
 }
 
 HAL_StatusTypeDef ADXL345_Reg_Write_I2C(uint8_t regaddr, uint8_t data) {

@@ -52,6 +52,8 @@ DMA_HandleTypeDef hdma_spi5_tx;
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
+_Bool loop = 1;
+
 volatile uint8_t data;
 uint16_t gyro[3];
 volatile int16_t x_axis_l3gd20;
@@ -76,8 +78,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI5_Init(void);
-static void MX_TIM2_Init(void);
 static void MX_I2C3_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 static void calculate_angle(void);
@@ -121,8 +123,8 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_SPI5_Init();
-  MX_TIM2_Init();
   MX_I2C3_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -134,17 +136,19 @@ int main(void)
 
   L3GD20_Init(&hspi5, &x_axis_l3gd20, &y_axis_l3gd20, &z_axis_l3gd20, &xdps, &ydps, &zdps);
   ADXL345_Init_I2C(&hi2c3, &x_axis_adxl345, &y_axis_adxl345, &z_axis_adxl345);
-  HAL_StatusTypeDef res = ADXL345_Reg_Read_I2C(ADXL345_DEVID, &pRx);
-
   HAL_TIM_Base_Start_IT(&htim2);
-
-
+  HAL_StatusTypeDef status = ADXL345_Reg_Read_I2C(ADXL345_DEVID, &pRx);
+  //
+  //
     while (1)
   {
     	//ana loop
-    	ADXL345_ReadAxes_DMA_I2C();
-    	L3GD20_ReadAxes_DMA();
+    	if(loop) {
+        	ADXL345_ReadAxes_DMA_I2C();
+        	loop = 0;
+    	}
     	HAL_Delay(1);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -424,8 +428,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : B1_Pin MEMS_INT1_Pin MEMS_INT2_Pin TP_INT1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin|MEMS_INT1_Pin|MEMS_INT2_Pin|TP_INT1_Pin;
+  /*Configure GPIO pins : B1_Pin MEMS_INT1_Pin TP_INT1_Pin */
+  GPIO_InitStruct.Pin = B1_Pin|MEMS_INT1_Pin|TP_INT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -446,12 +450,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(ACP_RST_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : OTG_FS_OC_Pin */
-  GPIO_InitStruct.Pin = OTG_FS_OC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(OTG_FS_OC_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : R3_Pin R6_Pin */
   GPIO_InitStruct.Pin = R3_Pin|R6_Pin;
@@ -596,7 +594,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim -> Instance == TIM2) {
@@ -604,16 +601,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
+//l3gd20 readaxes dma callback
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if (hspi -> Instance == SPI5) {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET); //stop SPI transfer
 		L3GD20_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
 		calculate_angle();
+		//Here, make the calculations to eliminate gravity before handing the flag
+		loop = 1;
 	}
 }
+//adxl345 readaxes dma callback
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	if (hi2c -> Instance == I2C3) {
 		ADXL345_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
+		L3GD20_ReadAxes_DMA(); //hand the flag
 	}
 }
 static void calculate_angle() {
