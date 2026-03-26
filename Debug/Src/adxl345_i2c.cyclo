@@ -1,6 +1,8 @@
-../Src/adxl345_i2c.c:9:19:ADXL345_Reg_Read_I2C	1
-../Src/adxl345_i2c.c:20:6:ADXL345_Init_I2C	1
-../Src/adxl345_i2c.c:39:19:ADXL345_Reg_Write_I2C	1
-../Src/adxl345_i2c.c:50:19:ADXL345_Reg_ReadMulti_I2C	1
-../Src/adxl345_i2c.c:61:6:ADXL345_ReadAxes_I2C	1
-../Src/adxl345_i2c.c:71:7:adxl345_convert_to_g	1
+../Src/adxl345_i2c.c:10:19:ADXL345_Reg_Read_I2C	1
+../Src/adxl345_i2c.c:21:6:ADXL345_Init_I2C	1
+../Src/adxl345_i2c.c:40:19:ADXL345_Reg_Write_I2C	1
+../Src/adxl345_i2c.c:51:19:ADXL345_Reg_ReadMulti_I2C	1
+../Src/adxl345_i2c.c:62:6:ADXL345_ReadAxes_I2C	1
+../Src/adxl345_i2c.c:71:19:ADXL345_ReadAxes_DMA_I2C	1
+../Src/adxl345_i2c.c:81:6:ADXL345_ReadValuesFromRx	1
+../Src/adxl345_i2c.c:86:7:adxl345_convert_to_g	1

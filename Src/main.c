@@ -43,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c3;
+DMA_HandleTypeDef hdma_i2c3_rx;
 
 SPI_HandleTypeDef hspi5;
 DMA_HandleTypeDef hdma_spi5_rx;
@@ -141,7 +142,7 @@ int main(void)
     while (1)
   {
     	//ana loop
-    	ADXL345_ReadAxes_I2C();
+    	ADXL345_ReadAxes_DMA_I2C();
     	L3GD20_ReadAxes_DMA();
     	HAL_Delay(1);
     /* USER CODE END WHILE */
@@ -336,8 +337,12 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA2_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
@@ -600,10 +605,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
-	if (hspi->Instance == SPI5) {
+	if (hspi -> Instance == SPI5) {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET); //stop SPI transfer
 		L3GD20_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
 		calculate_angle();
+	}
+}
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c -> Instance == I2C3) {
+		ADXL345_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
 	}
 }
 static void calculate_angle() {

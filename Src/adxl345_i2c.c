@@ -6,6 +6,7 @@
 
 static I2C_HandleTypeDef *hi2c3;
 volatile int16_t *x, *y, *z;
+uint8_t i2c_rx_buf[6];
 HAL_StatusTypeDef ADXL345_Reg_Read_I2C(uint8_t regaddr, uint8_t *pRx) {
 	return HAL_I2C_Mem_Read(
 			hi2c3,
@@ -67,7 +68,21 @@ void ADXL345_ReadAxes_I2C() {
 	*z = (int16_t) ((rx_buf[5] << 8) | rx_buf[4]);
 }
 
+HAL_StatusTypeDef ADXL345_ReadAxes_DMA_I2C() {
+	return HAL_I2C_Mem_Read_DMA(
+			hi2c3,
+			(ADXL345_ADDR) << 1,
+			ADXL345_DATAX0,
+			I2C_MEMADD_SIZE_8BIT,
+			i2c_rx_buf,
+			6);
 
+}
+void ADXL345_ReadValuesFromRx() {
+	*x = (i2c_rx_buf[1] << 8) | i2c_rx_buf[0];
+	*y = (i2c_rx_buf[3] << 8) | i2c_rx_buf[2];
+	*z = (i2c_rx_buf[5] << 8) | i2c_rx_buf[4];
+}
 float adxl345_convert_to_g(int16_t raw_value) {
     // For full resolution mode, the scale factor is 4mg/LSB
     return raw_value * 0.004f; // Convert to g

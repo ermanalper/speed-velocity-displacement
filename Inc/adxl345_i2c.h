@@ -45,6 +45,6 @@ void ADXL345_ReadAxes_I2C(void);
 HAL_StatusTypeDef ADXL345_Reg_ReadMulti_I2C(uint8_t baseaddr, uint8_t *pBuffer, uint16_t len);
 HAL_StatusTypeDef ADXL345_Reg_Write_I2C(uint8_t regaddr, uint8_t data);
 float adxl345_convert_to_g(int16_t raw_value);
-
-
+void ADXL345_ReadValuesFromRx(void);
+HAL_StatusTypeDef ADXL345_ReadAxes_DMA_I2C(void);
 #endif
