@@ -24,6 +24,9 @@
 #include "l3gd20.h"
 #include "math.h"
 #include "adxl345_i2c.h"
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,10 +68,16 @@ volatile int16_t z_axis_adxl345;
 volatile float xdps;
 volatile float ydps;
 volatile float zdps;
-float x_ang, y_ang, z_ang; //x_ang: angle between x an yz field ...
+float x_ang, y_ang, z_ang; //x_ang: angle between x an yz field ... (l3gd20)
+float grav_x, grav_y, grav_z;
+float x_ang, y_ang, z_ang; //x_ang: Roll, y_ang: Pitch, z_ang: Yaw
+float grav_x, grav_y, grav_z;
+float lin_acc_x, lin_acc_y, lin_acc_z; // acceleration after gravity is eliminated
 _Bool l3gd20_calibrated = 0;
+_Bool adxl345_calibrated = 0;
 uint8_t calibration_counter = 0;
-float x_bias = 0.0f, y_bias = 0.0f, z_bias = 0.0f;
+float l3gd20_x_bias = 0.0f, l3gd20_y_bias = 0.0f, l3gd20_z_bias = 0.0f;
+float adxl345_x_avg = 0.0f, adxl345_y_avg = 0.0f, adxl345_z_avg = 0.0f;
 uint8_t pRx = 10;
 
 /* USER CODE END PV */
@@ -82,7 +91,8 @@ static void MX_I2C3_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
-static void calculate_angle(void);
+static void l3gd20_calculate_angle(void);
+static void adxl345_calculate_orientation(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -606,8 +616,37 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if (hspi -> Instance == SPI5) {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET); //stop SPI transfer
 		L3GD20_ReadValuesFromRx(); //Read axes' values from rx buffer. No transfer is happening here, only the transferred data is read
-		calculate_angle();
-		//Here, make the calculations to eliminate gravity before handing the flag
+		l3gd20_calculate_angle();
+		if(calibration_counter < 250) {
+			/*Calculate orientation in space without any additional forces other than gravity
+			 * using the average of first 250 samples
+			 * */
+			adxl345_x_avg += (float) x_axis_adxl345;
+			adxl345_y_avg += (float) y_axis_adxl345;
+			adxl345_z_avg += (float) z_axis_adxl345;
+		} else if (!adxl345_calibrated) {
+			adxl345_x_avg /= 250.0f;
+			adxl345_y_avg /= 250.0f;
+			adxl345_z_avg /= 250.0f;
+			adxl345_calculate_orientation();
+			adxl345_calibrated = 1;
+		} else {
+			//eliminate gravity
+
+			float pitch_rad = y_ang * (M_PI / 180.0f);
+			float roll_rad  = x_ang * (M_PI / 180.0f);
+
+
+			grav_x = -sinf(pitch_rad) * 250.0f;
+			grav_y = sinf(roll_rad) * cosf(pitch_rad) * 250.0f;
+			grav_z = cosf(roll_rad) * cosf(pitch_rad) * 250.0f;
+
+			lin_acc_x = ((float)x_axis_adxl345 - grav_x) * 0.0039f;
+			lin_acc_y = ((float)y_axis_adxl345 - grav_y) * 0.0039f;
+			lin_acc_z = ((float)z_axis_adxl345 - grav_z) * 0.0039f;
+
+
+		}
 		loop = 1;
 	}
 }
@@ -618,27 +657,27 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 		L3GD20_ReadAxes_DMA(); //hand the flag
 	}
 }
-static void calculate_angle() {
+static void l3gd20_calculate_angle() {
 	if (!l3gd20_calibrated) {
 		//use data to calibrate
 		calibration_counter += 1;
-		x_bias += (float)x_axis_l3gd20;
-		y_bias += (float)y_axis_l3gd20;
-		z_bias += (float)z_axis_l3gd20;
+		l3gd20_x_bias += (float)x_axis_l3gd20;
+		l3gd20_y_bias += (float)y_axis_l3gd20;
+		l3gd20_z_bias += (float)z_axis_l3gd20;
 		if (calibration_counter >= 250) {
-			x_bias /= 250.0f;
-		    y_bias /= 250.0f;
-		    z_bias /= 250.0f;
-		    x_bias *= 0.00875f;
-		    y_bias *= 0.00875f;
-		    z_bias *= 0.00875f;
+			l3gd20_x_bias /= 250.0f;
+		    l3gd20_y_bias /= 250.0f;
+		    l3gd20_z_bias /= 250.0f;
+		    l3gd20_x_bias *= 0.00875f;
+		    l3gd20_y_bias *= 0.00875f;
+		    l3gd20_z_bias *= 0.00875f;
 		  l3gd20_calibrated = 1;
 		}
 		return;
 	}
-	xdps -= x_bias;
-	ydps -= y_bias;
-	zdps -= z_bias;
+	xdps -= l3gd20_x_bias;
+	ydps -= l3gd20_y_bias;
+	zdps -= l3gd20_z_bias;
 
 	if(fabs(xdps) <= 0.5f) xdps = 0.0f;
 	if(fabs(ydps) <= 0.5f) ydps = 0.0f;
@@ -656,6 +695,13 @@ static void calculate_angle() {
 	while(z_ang >= 360.0) z_ang -= 360.0;
 	while(z_ang < 0.0) z_ang += 360.0;
 
+}
+static void adxl345_calculate_orientation() {
+	x_ang = atan2f(adxl345_y_avg, adxl345_z_avg) * (180.0f / M_PI);
+	y_ang = atan2f(-adxl345_x_avg, sqrtf((adxl345_y_avg * adxl345_y_avg) + (adxl345_z_avg * adxl345_z_avg))) * (180.0f / M_PI);
+
+	while(x_ang < 0.0f) x_ang += 360.0f;
+	while(y_ang < 0.0f) y_ang += 360.0f;
 }
 /* USER CODE END 4 */
 
